@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Coordinates boilerplate example</title>
+    <style>
+      body, html{
+        background: #000;
+        margin: 0;
+        min-height: 100vh;
+        overflow: hidden;
+      }
+    </style>
+  </head>
+  <body>
+<script type="module">
+
+  import * as Coordinates from
+  "https://srmcgann.github.io/Coordinates/coordinates.min.js"
+
+  var rendererOptions = {
+    ambientLight: .5, margin: 0,
+    fov: 500, width: 1920, height: 1080,
+    //fov: 1e3/2, width: 1920/2, height: 1080/2,
+    // uncomment above for lower-res, higher-performance canvas
+  }
+  var renderer = await Coordinates.Renderer(rendererOptions)
+  
+  var refTexture = 'https://srmcgann.github.io/Coordinates/resources/equisky_ultra_inverted.png'
+  
+  var S = Math.sin
+  var C = Math.cos
+  var Rn = Math.random
+  
+  var x, y, z, p, q, d
+  
+  Coordinates.AnimationLoop(renderer, 'Draw')
+
+  var shaderOptions = [
+    {lighting: {type: 'ambientLight', value: .5}},
+    { uniform: {
+      type: 'phong',
+      value: 0
+    } },
+    { uniform: {
+      type: 'reflection',
+      map: refTexture,
+      enabled: false,
+      value: .1
+    } },
+  ]
+  var shader = await Coordinates.BasicShader(renderer, shaderOptions)
+
+  var shaderOptions = [
+    {lighting: {type: 'ambientLight', value: .1}},
+    { uniform: {
+      type: 'phong',
+      value: 0
+    } }
+  ]
+  var backgroundShader = await Coordinates.BasicShader(renderer, shaderOptions)
+
+
+  var shapes = []
+
+  var geoOptions = {
+    shapeType: 'dodecahedron',
+    name: 'background',
+    sphereize: 1,
+    yaw: Math.PI,
+    subs: 4,
+    map: refTexture,
+    size: 5e3,
+    colorMix: 0,
+  }
+  await Coordinates.LoadGeometry(renderer, geoOptions).then(async (geometry) => {
+    shapes.push(geometry)
+    await backgroundShader.ConnectGeometry(geometry)
+  })
+  
+  const GenQuad = (qx=0, qy=0, qz=0, size = 1) => {
+    var sd = 4, ret = [], x, y, z
+    for(var i = 0; i < sd; i++){
+      x = S(p=Math.PI*2/sd*i+Math.PI/sd)*size + qx
+      y = C(p)*size + qy
+      z = qz
+      ret.push([x,y,z])
+      x = S(p=Math.PI*2/sd*(i+1)+Math.PI/sd)*size + qx
+      y = C(p)*size + qy
+      z = 0 + qz
+      ret.push([x,y,z])
+    }
+    return ret
+  }
+  
+  var domain = GenQuad()
+  geometryData = []
+  geometryData.push(...domain)
+  
+  var cx, cy, cz, tgtDepth = 4
+  var geometryData, a, b, e
+  const recurse = (quad, depth=0) => {
+    if(depth >= tgtDepth) return
+    var cx = (quad[0][0] + quad[3][0]) / 2
+    var cy = (quad[0][1] + quad[3][1]) / 2
+    var cz = (quad[0][2] + quad[3][2]) / 2
+    var d = Math.hypot(cx-quad[0][0],cy-quad[0][1],cz-quad[0][2])
+    for(var m = 0; m < 8; m+=2){
+      var x = quad[m][0]
+      var y = quad[m][1]
+      var z = quad[m][2]
+      var newQuad = GenQuad(a=(cx+x)/2, b=(cy+y)/2, e=(cz+z)/2, d / 2 / 1.2)
+      geometryData.push(...newQuad)
+      recurse(newQuad, depth+1)
+    }
+  }
+  
+  recurse(domain)
+  
+  var geoOptions = {
+    shapeType: 'lines',
+    geometryData,
+    name: 'square',
+    scaleX: 14,
+    scaleY: 14,
+    scaleZ: 14,
+    color: 0xffffff,
+    alpha: .1,
+    penumbra: .5,
+  }
+  await Coordinates.LoadGeometry(renderer, geoOptions).then(async (geometry) => {
+    size: .5,
+    shapes.push(geometry)
+  })  
+  
+  if(0) Coordinates.LoadFPSControls(renderer, {
+    flyMode: true,
+    crossharSel: 2,
+    crosshairSize: .5,
+  })
+  
+  //uncomment above to enable mouse/keyboard controls
+  
+  renderer.z = renderer.width > 1e3 ? 10 : 20
+  
+  window.Draw = () => {
+    var t = renderer.t
+    renderer.Clear()
+    shapes.forEach(shape => {
+      switch(shape.name){
+        case 'background':
+          //shape.yaw += .005
+          //renderer.Draw(shape)
+        break
+        default:
+          renderer.Draw(shape)
+        break
+      }
+    })
+  }
+  
+</script>
+  </body>
+</html>
