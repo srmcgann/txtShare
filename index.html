@@ -1,163 +1,237 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>Coordinates boilerplate example</title>
+    <title>text to file sharing tool</title>
+    <meta charset="UTF-8">
+    <link rel="icon" type="image/png" href="./favicon.png">
     <style>
-      body, html{
-        background: #000;
-        margin: 0;
+      html, body{
+        font-family: monospace;
+        font-size: 20px;
+        color: #afa;
+        background: #001;
         min-height: 100vh;
-        overflow: hidden;
+        margin: 0;
+        overflow-x: hidden;
+      }
+      #header{
+        height: 30px;
+        background: linear-gradient(90deg, #000, #4ff2, #40f6);
+        color: #fff;
+        border-bottom: 1px solid #4f84;
+      }
+      #inputArea:focus{
+        outline: none;
+      }
+      .progressDiv{
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        text-align: center;
+        display: inline=block;
+        width: 600px;
+        min-height: 200px;
+      }
+      #inputArea{
+        border: none;
+        margin: 5px;
+        width: calc(100% - 25px);
+        background: #000;
+        height: calc(100vh - 115px);
+        resize: none;
+        color: #cfa;
+        border: 3px solid #1238;
+        padding: 5px;
+      }
+      .sectionTitle{
+        padding-left: 10px;
+        padding-top: 10px;
+        color: #888;
+        display: inline-block;
+      }
+      .appButton{
+        border: 1px solid #40f4;
+        min-width: 120px;
+        font-family: monospace;
+        font-size: 20px;
+        padding: 2px;
+        margin-left: 25px;
+        border-radius: 10px;
+        background: #486;
+        display: none;
+        font-weight: 900;
+        text-shadow: 0px 0px 5px #fff;
+      }
+      #copyConfirmation{
+        display: none;
+        position: absolute;
+        width: 100vw;
+        height: 100vh;
+        top: 0;
+        left: 0;
+        background: #012d;
+        color: #8ff;
+        opacity: 1;
+        text-shadow: 0 0 5px #fff;
+        font-size: 46px;
+        text-align: center;
+        z-index: 10000;
+      }
+      #innerCopied{
+        position: absolute;
+        top: 50%;
+        width: 100%;
+        z-index: 1020;
+        text-align: center;
+        transform: translate(0, -50%) scale(2.0, 1);
+      }
+      .copyCodeAppendage{
+        display: inline-block;
+        vertical-align: top;
+      }
+      .copyButton{
+        background-image: url(clippy.svg);
+        background-color: transparent;
+        margin-left: -25px!important;
+      }
+      .overlay{
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        z-index: 100;
+        background-color: #011e;
+        color: #afe;
+        font-size: 20px;
+        display: none;
+        text-align: center;
       }
     </style>
   </head>
   <body>
-    <script type="module">
+    <div
+      class="overlay"
+      id="processingOverlay"
+    ></div>
+    <div id="copyConfirmation"><div id="innerCopied">COPIED!</div></div>
+    <div id="header">
+      <span style="margin-left: 10px;">text to file tool</span>
+      <span style="margin-left: 10px; color: #666;">[all files may be deleted after 72 hours]</span>
+    </div>
+    <div class="sectionTitle">share text as a downloadable file</div>
+    <button
+      class="appButton"
+      id="getLinkButton"
+      onclick="GenLink()"
+    >
+      text in browser link
+    </button>
+    <button
+      class="appButton"
+      id="getDownloadLinkButton"
+      onclick="GenLink(true)"
+    >
+      file link
+    </button>
+    <textarea
+      id="inputArea"
+      spellcheck="false"
+      tabindex="0"
+      placeholder="type or paste text to share"
+      oninput="process()"
+    ></textarea>
+    <script>
+    
+      var baseURL = "https://textfile.root.sx"
 
-      import * as Coordinates from
-      "https://srmcgann.github.io/Coordinates/coordinates.min.js"
-
-      var rendererOptions = {
-        ambientLight: .5, margin: 0,
-        fov: 500, width: 1920, height: 1080,
-        //fov: 1e3/2, width: 1920/2, height: 1080/2,
-        // uncomment above for lower-res, higher-performance canvas
-      }
-      var renderer = await Coordinates.Renderer(rendererOptions)
+      window.onload = () => inputArea.focus()
+      var processing = false
       
-      var refTexture = 'https://srmcgann.github.io/Coordinates/resources/equisky_ultra_inverted.png'
+      var getLinkButton = document.querySelector('#getLinkButton')
+      var getDownloadLinkButton = document.querySelector('#getDownloadLinkButton')
+      var inputArea = document.querySelector('#inputArea')
+      var processingOverlay = document.querySelector('#processingOverlay')
       
-      var S = Math.sin
-      var C = Math.cos
-      var Rn = Math.random
-      
-      var x, y, z, p, q, d
-      
-      Coordinates.AnimationLoop(renderer, 'Draw')
-
-      var shaderOptions = [
-        {lighting: {type: 'ambientLight', value: .5}},
-        { uniform: {
-          type: 'phong',
-          value: 0
-        } },
-        { uniform: {
-          type: 'reflection',
-          map: refTexture,
-          enabled: false,
-          value: .1
-        } },
-      ]
-      var shader = await Coordinates.BasicShader(renderer, shaderOptions)
-
-      var shaderOptions = [
-        {lighting: {type: 'ambientLight', value: .1}},
-        { uniform: {
-          type: 'phong',
-          value: 0
-        } }
-      ]
-      var backgroundShader = await Coordinates.BasicShader(renderer, shaderOptions)
-
-
-      var shapes = []
-
-      var geoOptions = {
-        shapeType: 'dodecahedron',
-        name: 'background',
-        sphereize: 1,
-        yaw: Math.PI,
-        subs: 4,
-        map: refTexture,
-        size: 5e3,
-        colorMix: 0,
-      }
-      await Coordinates.LoadGeometry(renderer, geoOptions).then(async (geometry) => {
-        shapes.push(geometry)
-        await backgroundShader.ConnectGeometry(geometry)
-      })
-      
-      const GenQuad = (qx=0, qy=0, qz=0, size = 1) => {
-        var sd = 4, ret = [], x, y, z
-        for(var i = 0; i < sd; i++){
-          x = S(p=Math.PI*2/sd*i+Math.PI/sd)*size + qx
-          y = C(p)*size + qy
-          z = qz
-          ret.push([x,y,z])
-          x = S(p=Math.PI*2/sd*(i+1)+Math.PI/sd)*size + qx
-          y = C(p)*size + qy
-          z = 0 + qz
-          ret.push([x,y,z])
-        }
-        return ret
-      }
-      
-      var domain = GenQuad()
-      geometryData = []
-      geometryData.push(...domain)
-      
-      var cx, cy, cz, tgtDepth = 4
-      var geometryData, a, b, e
-      const recurse = (quad, depth=0) => {
-        if(depth >= tgtDepth) return
-        var cx = (quad[0][0] + quad[3][0]) / 2
-        var cy = (quad[0][1] + quad[3][1]) / 2
-        var cz = (quad[0][2] + quad[3][2]) / 2
-        var d = Math.hypot(cx-quad[0][0],cy-quad[0][1],cz-quad[0][2])
-        for(var m = 0; m < 8; m+=2){
-          var x = quad[m][0]
-          var y = quad[m][1]
-          var z = quad[m][2]
-          var newQuad = GenQuad(a=(cx+x)/2, b=(cy+y)/2, e=(cz+z)/2, d / 2 / 1.2)
-          geometryData.push(...newQuad)
-          recurse(newQuad, depth+1)
+      const process = () => {
+        if(inputArea.value){
+          getLinkButton.style.display = 'inline-block'
+          getDownloadLinkButton.style.display = 'inline-block'
+        }else{
+          getLinkButton.style.display = 'none'
+          getDownloadLinkButton.style.display = 'none'
         }
       }
       
-      recurse(domain)
-      
-      var geoOptions = {
-        shapeType: 'lines',
-        geometryData,
-        name: 'square',
-        scaleX: 14,
-        scaleY: 14,
-        scaleZ: 14,
-        color: 0xffffff,
-        alpha: .1,
-        penumbra: .5,
-      }
-      await Coordinates.LoadGeometry(renderer, geoOptions).then(async (geometry) => {
-        size: .5,
-        shapes.push(geometry)
-      })  
-      
-      if(0) Coordinates.LoadFPSControls(renderer, {
-        flyMode: true,
-        crossharSel: 2,
-        crosshairSize: .5,
-      })
-      
-      //uncomment above to enable mouse/keyboard controls
-      
-      renderer.z = renderer.width > 1e3 ? 10 : 20
-      
-      window.Draw = () => {
-        var t = renderer.t
-        renderer.Clear()
-        shapes.forEach(shape => {
-          switch(shape.name){
-            case 'background':
-              //shape.yaw += .005
-              //renderer.Draw(shape)
-            break
-            default:
-              renderer.Draw(shape)
-            break
+      const GenLink = (download = false) => {
+        processing = true
+        const Loop = () => {
+          var t = Math.floor((new Date()).getTime() / 60)
+          var dots = ('.').repeat(t%8)
+          processingOverlay.innerHTML = ''
+          var progressDiv = document.createElement('div')
+          progressDiv.className = 'progressDiv'
+          progressDiv.innerText = dots + ' processing ' + dots
+          processingOverlay.appendChild(progressDiv)
+          if(processing) requestAnimationFrame(Loop)
+        }
+        Loop()
+        processingOverlay.style.display = 'block'
+        
+        console.log('sending text to server...')
+        var sendData = {text: inputArea.value, download}
+        fetch('./txtShare.php', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(sendData),
+        }).then(res=>res.json()).then(data=>{
+          console.log('server response: ', data)
+          if(data != "-1"){
+            processingOverlay.style.display = 'none'
+            copyLink(data)
+          }else{
+            processingOverlay.style.display = 'none'
+            alert('error! crap')
           }
         })
       }
       
+      const copyLink = slug => {
+        var range = document.createRange()
+        var tempDiv = document.createElement('pre')
+        tempDiv.style.display = 'inline-block'
+        tempDiv.style.position = 'absolute'
+        tempDiv.style.opacity = .00001
+        document.body.appendChild(tempDiv)
+        tempDiv.innerText = `${baseURL}/t/${slug}`
+        range.selectNode(tempDiv)
+        window.getSelection().removeAllRanges()
+        window.getSelection().addRange(range)
+        document.execCommand("copy")
+        window.getSelection().removeAllRanges()
+        let el = document.querySelector('#copyConfirmation')
+        el.style.display = 'block';
+        el.style.opacity = 1
+        tempDiv.remove()
+        const reduceOpacity = () => {
+          if(+el.style.opacity > 0){
+            el.style.opacity -= .06
+            if(+el.style.opacity<.1){
+              el.style.opacity = 1
+              el.style.display = 'none'
+            }else{
+              setTimeout(()=>{
+                reduceOpacity()
+              }, 10)
+            }
+          }
+        }
+        setTimeout(()=>{reduceOpacity()}, 250)
+      }
+
     </script>
   </body>
 </html>
